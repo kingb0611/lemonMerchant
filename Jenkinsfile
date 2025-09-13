@@ -20,7 +20,7 @@ pipeline {
     
     // VPC
     string(name: 'VPC_ID', defaultValue: 'vpc-08bb20cc06ca3c5d5', description: 'VPC ID for ALB and ECS')
-}
+  }
 
   environment {
     DOCKERHUB_REPO = "${params.DOCKERHUB_REPO}"
@@ -28,6 +28,7 @@ pipeline {
     ECS_CLUSTER    = "${params.ECS_CLUSTER}"
     ECS_SERVICE    = "${params.ECS_SERVICE}"
     TASK_FAMILY    = "${params.TASK_FAMILY}"
+    CONTAINER_PORT = "8080"
   }
 
   stages {
@@ -70,49 +71,50 @@ pipeline {
     }
 
     stage('Terraform Apply') {
-  steps {
-    withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-kbkn']]) {
-      dir('terraform') {
-        script {
-          // Convert ECS subnet and SG input into HCL-compatible list
-          def subnetList = params.SUBNET_IDS.split(',').collect { "\"${it.trim()}\"" }.join(',')
-          def sgList = params.SECURITY_GROUP_IDS.split(',').collect { "\"${it.trim()}\"" }.join(',')
+      steps {
+        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-kbkn']]) {
+          dir('terraform') {
+            script {
+              // Convert ECS subnet and SG input into HCL-compatible list
+              def subnetList = params.SUBNET_IDS.split(',').collect { "\"${it.trim()}\"" }.join(',')
+              def sgList = params.SECURITY_GROUP_IDS.split(',').collect { "\"${it.trim()}\"" }.join(',')
 
-          // Convert ALB subnet and SG input into HCL-compatible list
-          def albSubnetList = params.ALB_SUBNET_IDS.split(',').collect { "\"${it.trim()}\"" }.join(',')
-          def albSgList = params.ALB_SECURITY_GROUP_IDS.split(',').collect { "\"${it.trim()}\"" }.join(',')
+              // Convert ALB subnet and SG input into HCL-compatible list
+              def albSubnetList = params.ALB_SUBNET_IDS.split(',').collect { "\"${it.trim()}\"" }.join(',')
+              def albSgList = params.ALB_SECURITY_GROUP_IDS.split(',').collect { "\"${it.trim()}\"" }.join(',')
 
-          sh """
-            docker run --rm -v \$(pwd):/workspace -w /workspace \
-              -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
-              -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
-              -e AWS_DEFAULT_REGION=${AWS_REGION} \
-              hashicorp/terraform:1.6.0 init -input=false
+              sh """
+                docker run --rm -v \$(pwd):/workspace -w /workspace \
+                  -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
+                  -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
+                  -e AWS_DEFAULT_REGION=${AWS_REGION} \
+                  hashicorp/terraform:1.6.0 init -input=false
 
-            docker run --rm -v \$(pwd):/workspace -w /workspace \
-              -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
-              -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
-              -e AWS_DEFAULT_REGION=${AWS_REGION} \
-              hashicorp/terraform:1.6.0 apply -auto-approve \
-                -var 'aws_region=${AWS_REGION}' \
-                -var 'cluster_name=${ECS_CLUSTER}' \
-                -var 'service_name=${ECS_SERVICE}' \
-                -var 'task_family=${TASK_FAMILY}' \
-                -var 'initial_image=${DOCKERHUB_REPO}:latest' \
-                -var 'subnet_ids=[${subnetList}]' \
-                -var 'security_group_ids=[${sgList}]' \
-                -var 'assign_public_ip=${ASSIGN_PUBLIC_IP}' \
-                -var 'alb_subnets=[${albSubnetList}]' \
-                -var 'alb_security_group_ids=[${albSgList}]' \
-                -var 'vpc_id=${params.VPC_ID}'
-          """
+                docker run --rm -v \$(pwd):/workspace -w /workspace \
+                  -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
+                  -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
+                  -e AWS_DEFAULT_REGION=${AWS_REGION} \
+                  hashicorp/terraform:1.6.0 apply -auto-approve \
+                    -var 'aws_region=${AWS_REGION}' \
+                    -var 'cluster_name=${ECS_CLUSTER}' \
+                    -var 'service_name=${ECS_SERVICE}' \
+                    -var 'task_family=${TASK_FAMILY}' \
+                    -var 'initial_image=${DOCKERHUB_REPO}:latest' \
+                    -var 'subnet_ids=[${subnetList}]' \
+                    -var 'security_group_ids=[${sgList}]' \
+                    -var 'assign_public_ip=${ASSIGN_PUBLIC_IP}' \
+                    -var 'alb_subnets=[${albSubnetList}]' \
+                    -var 'alb_security_group_ids=[${albSgList}]' \
+                    -var 'vpc_id=${params.VPC_ID}' \
+                    -var 'container_port=${CONTAINER_PORT}'
+              """
+            }
+          }
         }
       }
     }
-  }
-}
 
-    stage('Fetch Terraform Outputs (main only)') {
+    stage('Fetch Terraform Outputs') {
       steps {
         dir('terraform') {
           sh """
@@ -129,7 +131,7 @@ pipeline {
       }
     }
 
-    stage('Deploy to ECS (main only)') {
+    stage('Deploy to ECS') {
       steps {
         withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-kbkn']]) {
           sh '''
@@ -141,6 +143,7 @@ pipeline {
             sed -i "s|__AWS_REGION__|${AWS_REGION}|g" taskdef.json
             sed -i "s|__TASK_FAMILY__|${TASK_FAMILY}|g" taskdef.json
             sed -i "s|__LOG_GROUP__|${LOG_GROUP}|g" taskdef.json
+            sed -i "s|__CONTAINER_PORT__|${CONTAINER_PORT}|g" taskdef.json
 
             aws ecs register-task-definition --cli-input-json file://taskdef.json --region ${AWS_REGION}
             aws ecs update-service --cluster ${ECS_CLUSTER} --service ${ECS_SERVICE} --force-new-deployment --region ${AWS_REGION}

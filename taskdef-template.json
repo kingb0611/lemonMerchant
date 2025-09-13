@@ -1,14 +1,14 @@
 {
   "family": "__TASK_FAMILY__",
+  "executionRoleArn": "__EXEC_ROLE__",
+  "taskRoleArn": "__TASK_ROLE__",
   "networkMode": "awsvpc",
   "requiresCompatibilities": ["FARGATE"],
   "cpu": "512",
   "memory": "1024",
-  "executionRoleArn": "__EXEC_ROLE__",
-  "taskRoleArn": "__TASK_ROLE__",
   "containerDefinitions": [
     {
-      "name": "lemonmerchant",
+      "name": "__TASK_FAMILY__",
       "image": "__IMAGE__",
       "essential": true,
       "portMappings": [
@@ -17,12 +17,18 @@
           "protocol": "tcp"
         }
       ],
+      "environment": [
+        {
+          "name": "ENV",
+          "value": "production"
+        }
+      ],
       "logConfiguration": {
         "logDriver": "awslogs",
         "options": {
           "awslogs-group": "__LOG_GROUP__",
           "awslogs-region": "__AWS_REGION__",
-          "awslogs-stream-prefix": "ecs"
+          "awslogs-stream-prefix": "__TASK_FAMILY__"
         }
       }
     }

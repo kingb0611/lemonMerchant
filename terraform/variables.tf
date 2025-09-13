@@ -38,7 +38,7 @@ variable "assign_public_ip" {
   type        = bool
 }
 
-# --- New Variables for ALB ---
+# ALB Variables
 variable "alb_name" {
   description = "Name of the Application Load Balancer"
   type        = string

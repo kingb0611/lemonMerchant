@@ -1,4 +1,4 @@
-terraform {
+terraform { 
   required_version = ">= 1.3"
   required_providers {
     aws = {
@@ -54,51 +54,46 @@ resource "aws_cloudwatch_log_group" "ecs" {
   retention_in_days = 14
 }
 
-# Task definition
+# ECS Task Definition
 resource "aws_ecs_task_definition" "this" {
   family                   = var.task_family
   requires_compatibilities = ["FARGATE"]
   network_mode             = "awsvpc"
   cpu                      = "512"
   memory                   = "1024"
+  execution_role_arn       = aws_iam_role.task_execution.arn
+  task_role_arn            = aws_iam_role.task_role.arn
 
-  execution_role_arn = aws_iam_role.task_execution.arn
-  task_role_arn      = aws_iam_role.task_role.arn
-
-  container_definitions = jsonencode([
-    {
-      name      = var.service_name
-      image     = var.initial_image
-      essential = true
-      portMappings = [
-        {
-          containerPort = var.container_port
-          protocol      = "tcp"
-        }
-      ]
-      logConfiguration = {
-        logDriver = "awslogs"
-        options = {
-          awslogs-group         = aws_cloudwatch_log_group.ecs.name
-          awslogs-region        = var.aws_region
-          awslogs-stream-prefix = "ecs"
-        }
+  container_definitions = jsonencode([{
+    name      = var.service_name
+    image     = var.initial_image
+    essential = true
+    portMappings = [{
+      containerPort = var.container_port
+      protocol      = "tcp"
+    }]
+    logConfiguration = {
+      logDriver = "awslogs"
+      options = {
+        awslogs-group         = aws_cloudwatch_log_group.ecs.name
+        awslogs-region        = var.aws_region
+        awslogs-stream-prefix = var.service_name
       }
     }
-  ])
+  }])
 }
 
-# --- ALB Resources ---
+# Application Load Balancer
 resource "aws_lb" "this" {
   name               = var.alb_name
   internal           = false
   load_balancer_type = "application"
   security_groups    = var.alb_security_group_ids
   subnets            = var.alb_subnets
-
   enable_deletion_protection = false
 }
 
+# Target Group for ECS Service
 resource "aws_lb_target_group" "ecs_tg" {
   name        = "${var.alb_name}-tg"
   port        = var.container_port
@@ -114,9 +109,11 @@ resource "aws_lb_target_group" "ecs_tg" {
     unhealthy_threshold = 2
     interval            = 30
     timeout             = 5
+    enabled             = true
   }
 }
 
+# ALB Listener
 resource "aws_lb_listener" "http" {
   load_balancer_arn = aws_lb.this.arn
   port              = 80
@@ -128,7 +125,7 @@ resource "aws_lb_listener" "http" {
   }
 }
 
-# ECS Service with ALB
+# ECS Service
 resource "aws_ecs_service" "this" {
   name            = var.service_name
   cluster         = aws_ecs_cluster.this.id
@@ -152,7 +149,5 @@ resource "aws_ecs_service" "this" {
     ignore_changes = [task_definition]
   }
 
-  depends_on = [
-    aws_lb_listener.http
-  ]
+  depends_on = [aws_lb_listener.http]
 }
