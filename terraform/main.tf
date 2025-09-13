@@ -108,7 +108,7 @@ resource "aws_lb_target_group" "ecs_tg" {
     healthy_threshold   = 2
     unhealthy_threshold = 2
     interval            = 120
-    timeout             = 300
+    timeout             = 180
     enabled             = true
   }
 }
