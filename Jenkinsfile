@@ -9,6 +9,9 @@ pipeline {
     string(name: 'TASK_FAMILY', defaultValue: 'lemonmerchant', description: 'ECS Task definition family')
     string(name: 'SUBNET_IDS', defaultValue: 'subnet-0d6a7e801ac724083,subnet-08956fdaa29acf672', description: 'Comma-separated Subnet IDs for ECS tasks')
     string(name: 'SECURITY_GROUP_IDS', defaultValue: 'sg-0cc4381d9ea62a731', description: 'Comma-separated Security Group IDs for ECS tasks')
+    string(name: 'ALB_SUBNET_IDS', defaultValue: 'subnet-099cd2ccb7a6121e4,subnet-0d6a7e801ac724083', description: 'ALB subnet IDs')
+    string(name: 'ALB_SECURITY_GROUP_IDS', defaultValue: 'sg-0cc4381d9ea62a731', description: 'ALB security group IDs')
+    string(name: 'VPC_ID', defaultValue: 'vpc-08bb20cc06ca3c5d5', description: 'VPC ID for ALB')
     booleanParam(name: 'ASSIGN_PUBLIC_IP', defaultValue: true, description: 'Assign public IP to tasks?')
   }
 
@@ -87,7 +90,10 @@ pipeline {
                     -var 'initial_image=${DOCKERHUB_REPO}:latest' \
                     -var 'subnet_ids=[${subnetList}]' \
                     -var 'security_group_ids=[${sgList}]' \
-                    -var 'assign_public_ip=${ASSIGN_PUBLIC_IP}'
+                    -var 'assign_public_ip=${ASSIGN_PUBLIC_IP}' \
+                    -var 'alb_subnets=[${albSubnetList}]' \
+                    -var 'alb_security_group_ids=[${albSgList}]' \
+                    -var 'vpc_id=${params.VPC_ID}'
               """
             }
           }
