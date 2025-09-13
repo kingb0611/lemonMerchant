@@ -25,7 +25,7 @@ pipeline {
       steps {
         checkout scm
         script {
-          GIT_COMMIT_SHORT = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
+          def GIT_COMMIT_SHORT = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
           env.IMAGE_TAG = "${GIT_COMMIT_SHORT}-${env.BUILD_NUMBER}"
         }
       }
@@ -33,7 +33,10 @@ pipeline {
 
     stage('Build (Maven)') {
       steps {
-        sh './mvnw -B -DskipTests clean package'
+        sh '''
+        chmod +x mvnw
+        ./mvnw -B -DskipTests clean package
+        '''
       }
     }
 
