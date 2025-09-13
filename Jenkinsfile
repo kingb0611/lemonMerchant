@@ -62,7 +62,7 @@ pipeline {
 
     stage('Terraform Apply') {
       steps {
-        withCredentials([usernamePassword(credentialsId: 'aws-kbkn', usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY')]) {
+        withAWS(credentials: 'aws-kbkn', region: "${AWS_REGION}") {
           dir('terraform') {
             sh '''
               export AWS_DEFAULT_REGION=${AWS_REGION}
@@ -98,9 +98,9 @@ pipeline {
 
     stage('Deploy to ECS (main only)') {
       steps {
-        withCredentials([usernamePassword(credentialsId: 'aws-kbkn', usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY')]) {
+        withAWS(credentials: 'aws-kbkn', region: "${AWS_REGION}") {
           sh '''
-            export AWS_DEFAULT_REGION=${AWS_REGION}
+            echo "Deploying ${DOCKERHUB_REPO}:${IMAGE_TAG} to ECS..."
             IMAGE_FULL=${DOCKERHUB_REPO}:${IMAGE_TAG}
 
             cp taskdef-template.json taskdef.json
