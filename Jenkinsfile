@@ -66,9 +66,8 @@ pipeline {
                   credentialsId: 'aws-kbkn']]) {
             dir('terraform') {
             sh '''
-              export AWS_DEFAULT_REGION=${AWS_REGION}
-              terraform init -input=false
-              terraform apply -auto-approve \
+              docker run --rm -v $(pwd):/workspace -w /workspace hashicorp/terraform:1.6.0 init -input=false
+              docker run --rm -v $(pwd):/workspace -w /workspace hashicorp/terraform:1.6.0 apply -auto-approve \
                 -var "aws_region=${AWS_REGION}" \
                 -var "cluster_name=${ECS_CLUSTER}" \
                 -var "service_name=${ECS_SERVICE}" \
