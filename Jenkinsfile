@@ -3,7 +3,7 @@ pipeline {
 
   parameters {
     string(name: 'DOCKERHUB_REPO', defaultValue: 'kbkn1106/lemonmerchant', description: 'Docker Hub repo (user/repo)')
-    string(name: 'AWS_REGION', defaultValue: 'ap-south-1', description: 'AWS Region')
+    string(name: 'AWS_REGION', defaultValue: 'ap-south-1', description: 'AWS REGION')
     string(name: 'ECS_CLUSTER', defaultValue: 'lemon-cluster', description: 'ECS Cluster name')
     string(name: 'ECS_SERVICE', defaultValue: 'lemon-service', description: 'ECS Service name')
     string(name: 'TASK_FAMILY', defaultValue: 'lemonmerchant', description: 'ECS Task definition family')
