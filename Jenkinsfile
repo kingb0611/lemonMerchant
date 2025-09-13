@@ -62,8 +62,9 @@ pipeline {
 
     stage('Terraform Apply') {
       steps {
-        withAWS(credentials: 'aws-kbkn', region: "${AWS_REGION}") {
-          dir('terraform') {
+        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', 
+                  credentialsId: 'aws-kbkn']]) {
+            dir('terraform') {
             sh '''
               export AWS_DEFAULT_REGION=${AWS_REGION}
               terraform init -input=false
@@ -98,7 +99,8 @@ pipeline {
 
     stage('Deploy to ECS (main only)') {
       steps {
-        withAWS(credentials: 'aws-kbkn', region: "${AWS_REGION}") {
+        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', 
+                  credentialsId: 'aws-kbkn']]) {
           sh '''
             echo "Deploying ${DOCKERHUB_REPO}:${IMAGE_TAG} to ECS..."
             IMAGE_FULL=${DOCKERHUB_REPO}:${IMAGE_TAG}
