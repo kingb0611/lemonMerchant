@@ -70,52 +70,6 @@ pipeline {
       }
     }
 
-    stage('Terraform Destroy') {
-      steps {
-       withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-kbkn']]) {
-        dir('terraform') {
-          script {
-          // Convert ECS subnet and SG input into HCL-compatible list
-          def subnetList = params.SUBNET_IDS.split(',').collect { "\"${it.trim()}\"" }.join(',')
-          def sgList = params.SECURITY_GROUP_IDS.split(',').collect { "\"${it.trim()}\"" }.join(',')
-
-          // Convert ALB subnet and SG input into HCL-compatible list
-          def albSubnetList = params.ALB_SUBNET_IDS.split(',').collect { "\"${it.trim()}\"" }.join(',')
-          def albSgList = params.ALB_SECURITY_GROUP_IDS.split(',').collect { "\"${it.trim()}\"" }.join(',')
-
-          sh """
-            docker run --rm -v \$(pwd):/workspace -w /workspace \
-              -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
-              -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
-              -e AWS_DEFAULT_REGION=${AWS_REGION} \
-              hashicorp/terraform:1.6.0 init -input=false
-
-            docker run --rm -v \$(pwd):/workspace -w /workspace \
-              -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
-              -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
-              -e AWS_DEFAULT_REGION=${AWS_REGION} \
-              hashicorp/terraform:1.6.0 destroy -auto-approve \
-                -var 'aws_region=${AWS_REGION}' \
-                -var 'cluster_name=${ECS_CLUSTER}' \
-                -var 'service_name=${ECS_SERVICE}' \
-                -var 'task_family=${TASK_FAMILY}' \
-                -var 'initial_image=${DOCKERHUB_REPO}:latest' \
-                -var 'subnet_ids=[${subnetList}]' \
-                -var 'security_group_ids=[${sgList}]' \
-                -var 'assign_public_ip=${ASSIGN_PUBLIC_IP}' \
-                -var 'alb_subnets=[${albSubnetList}]' \
-                -var 'alb_security_group_ids=[${albSgList}]' \
-                -var 'vpc_id=${params.VPC_ID}' \
-                -var 'container_port=8080'
-          """
-              }
-            }
-        }
-      }
-    }
-
-
-
     stage('Terraform Apply') {
       steps {
         withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-kbkn']]) {
