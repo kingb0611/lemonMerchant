@@ -106,7 +106,7 @@ pipeline {
                 -var 'alb_subnets=[${albSubnetList}]' \
                 -var 'alb_security_group_ids=[${albSgList}]' \
                 -var 'vpc_id=${params.VPC_ID}' \
-                -var 'container_port=9090'
+                -var 'container_port=8080'
           """
               }
             }
