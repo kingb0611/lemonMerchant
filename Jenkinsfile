@@ -60,10 +60,7 @@ pipeline {
   }
 }
 
-    stage('Terraform Apply (main only)') {
-      when {
-        branch 'main'
-      }
+    stage('Terraform Apply') {
       steps {
         withCredentials([usernamePassword(credentialsId: 'aws-kbkn', usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY')]) {
           dir('terraform') {
@@ -86,9 +83,6 @@ pipeline {
     }
 
     stage('Fetch Terraform Outputs (main only)') {
-      when {
-        branch 'main'
-      }
       steps {
         dir('terraform') {
           sh 'terraform output -json > tf_outputs.json'
@@ -103,9 +97,6 @@ pipeline {
     }
 
     stage('Deploy to ECS (main only)') {
-      when {
-        branch 'main'
-      }
       steps {
         withCredentials([usernamePassword(credentialsId: 'aws-kbkn', usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY')]) {
           sh '''
