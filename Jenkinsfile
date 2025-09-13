@@ -7,8 +7,8 @@ pipeline {
     string(name: 'ECS_CLUSTER', defaultValue: 'lemon-cluster', description: 'ECS Cluster name')
     string(name: 'ECS_SERVICE', defaultValue: 'lemon-service', description: 'ECS Service name')
     string(name: 'TASK_FAMILY', defaultValue: 'lemonmerchant', description: 'ECS Task definition family')
-    string(name: 'SUBNET_IDS', defaultValue: '["subnet-123","subnet-456"]', description: 'Subnets for ECS tasks (JSON list)')
-    string(name: 'SECURITY_GROUP_IDS', defaultValue: '["sg-abc123"]', description: 'Security groups for ECS tasks (JSON list)')
+    string(name: 'SUBNET_IDS', defaultValue: 'subnet-123,subnet-456', description: 'Comma-separated Subnet IDs for ECS tasks')
+    string(name: 'SECURITY_GROUP_IDS', defaultValue: 'sg-abc123', description: 'Comma-separated Security Group IDs for ECS tasks')
     booleanParam(name: 'ASSIGN_PUBLIC_IP', defaultValue: true, description: 'Assign public IP to tasks?')
   }
 
@@ -25,8 +25,7 @@ pipeline {
       steps {
         checkout scm
         script {
-          def GIT_COMMIT_SHORT = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
-          env.IMAGE_TAG = "${GIT_COMMIT_SHORT}-${env.BUILD_NUMBER}"
+          env.IMAGE_TAG = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim() + "-${env.BUILD_NUMBER}"
         }
       }
     }
@@ -34,8 +33,8 @@ pipeline {
     stage('Build (Maven)') {
       steps {
         sh '''
-        chmod +x mvnw
-        ./mvnw -B -DskipTests clean package
+          chmod +x mvnw
+          ./mvnw -B -DskipTests clean package
         '''
       }
     }
@@ -52,31 +51,35 @@ pipeline {
       steps {
         withCredentials([string(credentialsId: 'dockerhub-kbkn', variable: 'DOCKERHUB_PAT')]) {
           sh '''
-           echo "$DOCKERHUB_PAT" | docker login -u kbkn1106 --password-stdin
-           docker push ${DOCKERHUB_REPO}:${IMAGE_TAG}
+            echo "$DOCKERHUB_PAT" | docker login -u kbkn1106 --password-stdin
+            docker push ${DOCKERHUB_REPO}:${IMAGE_TAG}
             docker push ${DOCKERHUB_REPO}:latest
-            '''
+          '''
+        }
+      }
     }
-  }
-}
 
     stage('Terraform Apply') {
       steps {
-        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', 
-                  credentialsId: 'aws-kbkn']]) {
-            dir('terraform') {
-            sh '''
-              docker run --rm -v $(pwd):/workspace -w /workspace hashicorp/terraform:1.6.0 init -input=false
-              docker run --rm -v $(pwd):/workspace -w /workspace hashicorp/terraform:1.6.0 apply -auto-approve \
-                -var "aws_region=${AWS_REGION}" \
-                -var "cluster_name=${ECS_CLUSTER}" \
-                -var "service_name=${ECS_SERVICE}" \
-                -var "task_family=${TASK_FAMILY}" \
-                -var "initial_image=${DOCKERHUB_REPO}:latest" \
-                -var 'subnet_ids=${SUBNET_IDS}' \
-                -var 'security_group_ids=${SECURITY_GROUP_IDS}' \
-                -var "assign_public_ip=${ASSIGN_PUBLIC_IP}"
-            '''
+        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-kbkn']]) {
+          dir('terraform') {
+            script {
+              def subnetList = params.SUBNET_IDS.tokenize(',').collect { "\"${it.trim()}\"" }.join(',')
+              def sgList = params.SECURITY_GROUP_IDS.tokenize(',').collect { "\"${it.trim()}\"" }.join(',')
+
+              sh """
+                docker run --rm -v \$(pwd):/workspace -w /workspace hashicorp/terraform:1.6.0 init -input=false
+                docker run --rm -v \$(pwd):/workspace -w /workspace hashicorp/terraform:1.6.0 apply -auto-approve \
+                  -var "aws_region=${AWS_REGION}" \
+                  -var "cluster_name=${ECS_CLUSTER}" \
+                  -var "service_name=${ECS_SERVICE}" \
+                  -var "task_family=${TASK_FAMILY}" \
+                  -var "initial_image=${DOCKERHUB_REPO}:latest" \
+                  -var "subnet_ids=[${subnetList}]" \
+                  -var "security_group_ids=[${sgList}]" \
+                  -var "assign_public_ip=${ASSIGN_PUBLIC_IP}"
+              """
+            }
           }
         }
       }
@@ -85,7 +88,9 @@ pipeline {
     stage('Fetch Terraform Outputs (main only)') {
       steps {
         dir('terraform') {
-          sh 'terraform output -json > tf_outputs.json'
+          sh """
+            docker run --rm -v \$(pwd):/workspace -w /workspace hashicorp/terraform:1.6.0 output -json > tf_outputs.json
+          """
         }
         script {
           def tfOutputs = readJSON file: 'terraform/tf_outputs.json'
@@ -98,12 +103,9 @@ pipeline {
 
     stage('Deploy to ECS (main only)') {
       steps {
-        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', 
-                  credentialsId: 'aws-kbkn']]) {
+        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-kbkn']]) {
           sh '''
-            echo "Deploying ${DOCKERHUB_REPO}:${IMAGE_TAG} to ECS..."
             IMAGE_FULL=${DOCKERHUB_REPO}:${IMAGE_TAG}
-
             cp taskdef-template.json taskdef.json
             sed -i "s|__IMAGE__|${IMAGE_FULL}|g" taskdef.json
             sed -i "s|__EXEC_ROLE__|${TASK_EXECUTION_ROLE_ARN}|g" taskdef.json
