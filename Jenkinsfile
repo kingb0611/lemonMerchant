@@ -143,6 +143,7 @@ pipeline {
             sed -i "s|__AWS_REGION__|${AWS_REGION}|g" taskdef.json
             sed -i "s|__TASK_FAMILY__|${TASK_FAMILY}|g" taskdef.json
             sed -i "s|__LOG_GROUP__|${LOG_GROUP}|g" taskdef.json
+            sed -i "s|__CONTAINER_NAME__|lemon-service|g" taskdef.json
             sed -i "s|__CONTAINER_PORT__|${CONTAINER_PORT}|g" taskdef.json
 
             aws ecs register-task-definition --cli-input-json file://taskdef.json --region ${AWS_REGION}
