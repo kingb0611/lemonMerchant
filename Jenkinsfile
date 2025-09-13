@@ -107,6 +107,7 @@ pipeline {
           env.TASK_EXECUTION_ROLE_ARN = tfOutputs.task_execution_role_arn.value
           env.TASK_ROLE_ARN           = tfOutputs.task_role_arn.value
           env.LOG_GROUP               = tfOutputs.log_group.value
+          env.ALB_DNS                 = tfOutputs.alb_dns_name.value
         }
       }
     }
@@ -135,6 +136,7 @@ pipeline {
   post {
     success {
       echo "✅ Pipeline finished."
+      echo "🌐 Application available at: http://${env.ALB_DNS}"
     }
     failure {
       echo "❌ Pipeline failed — check logs."

@@ -24,7 +24,7 @@ WORKDIR /app
 COPY --from=builder /workspace/target/*.jar app.jar
 
 # Expose Spring Boot default port (change if needed)
-EXPOSE 9090
+EXPOSE 8080
 
 # Use minimal runtime flags (adjust as needed)
 ENTRYPOINT ["java","-jar","/app/app.jar"]

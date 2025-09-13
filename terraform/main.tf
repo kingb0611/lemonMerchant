@@ -54,7 +54,7 @@ resource "aws_cloudwatch_log_group" "ecs" {
   retention_in_days = 14
 }
 
-# Task definition (template, Jenkins will register new revisions later)
+# Task definition
 resource "aws_ecs_task_definition" "this" {
   family                   = var.task_family
   requires_compatibilities = ["FARGATE"]
@@ -72,7 +72,7 @@ resource "aws_ecs_task_definition" "this" {
       essential = true
       portMappings = [
         {
-          containerPort = 9090
+          containerPort = var.container_port
           protocol      = "tcp"
         }
       ]
@@ -88,7 +88,47 @@ resource "aws_ecs_task_definition" "this" {
   ])
 }
 
-# ECS Service
+# --- ALB Resources ---
+resource "aws_lb" "this" {
+  name               = var.alb_name
+  internal           = false
+  load_balancer_type = "application"
+  security_groups    = var.alb_security_group_ids
+  subnets            = var.alb_subnets
+
+  enable_deletion_protection = false
+}
+
+resource "aws_lb_target_group" "ecs_tg" {
+  name        = "${var.alb_name}-tg"
+  port        = var.container_port
+  protocol    = "HTTP"
+  target_type = "ip"
+  vpc_id      = var.vpc_id
+
+  health_check {
+    path                = "/"
+    port                = var.container_port
+    protocol            = "HTTP"
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+    interval            = 30
+    timeout             = 5
+  }
+}
+
+resource "aws_lb_listener" "http" {
+  load_balancer_arn = aws_lb.this.arn
+  port              = 80
+  protocol          = "HTTP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.ecs_tg.arn
+  }
+}
+
+# ECS Service with ALB
 resource "aws_ecs_service" "this" {
   name            = var.service_name
   cluster         = aws_ecs_cluster.this.id
@@ -102,7 +142,17 @@ resource "aws_ecs_service" "this" {
     assign_public_ip = var.assign_public_ip
   }
 
-  lifecycle {
-    ignore_changes = [task_definition] # Jenkins will register new revisions and update service
+  load_balancer {
+    target_group_arn = aws_lb_target_group.ecs_tg.arn
+    container_name   = var.service_name
+    container_port   = var.container_port
   }
+
+  lifecycle {
+    ignore_changes = [task_definition]
+  }
+
+  depends_on = [
+    aws_lb_listener.http
+  ]
 }
