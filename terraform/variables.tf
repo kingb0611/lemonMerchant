@@ -1,45 +1,39 @@
 variable "aws_region" {
+  description = "AWS region where resources will be created"
   type        = string
-  description = "AWS region"
-  default     = "ap-south-1"
 }
 
 variable "cluster_name" {
+  description = "ECS Cluster name"
   type        = string
-  description = "ECS cluster name"
-  default     = "lemon-cluster"
 }
 
 variable "service_name" {
+  description = "ECS Service name"
   type        = string
-  description = "ECS service name"
-  default     = "lemon-service"
 }
 
 variable "task_family" {
+  description = "ECS Task definition family"
   type        = string
-  description = "Task definition family"
-  default     = "lemonmerchant"
 }
 
 variable "initial_image" {
+  description = "Initial Docker image to deploy"
   type        = string
-  description = "Initial docker image (Jenkins will update later)"
-  default     = "kbkn1106/lemonmerchant:latest"
 }
 
 variable "subnet_ids" {
+  description = "List of subnet IDs for ECS tasks"
   type        = list(string)
-  description = "Subnets for ECS tasks"
 }
 
 variable "security_group_ids" {
+  description = "List of security group IDs for ECS tasks"
   type        = list(string)
-  description = "Security groups for ECS tasks"
 }
 
 variable "assign_public_ip" {
+  description = "Whether to assign a public IP to ECS tasks"
   type        = bool
-  description = "Assign public IP to Fargate task?"
-  default     = true
 }

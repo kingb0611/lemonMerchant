@@ -64,20 +64,30 @@ pipeline {
         withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-kbkn']]) {
           dir('terraform') {
             script {
-              def subnetList = params.SUBNET_IDS.tokenize(',').collect { "\"${it.trim()}\"" }.join(',')
-              def sgList = params.SECURITY_GROUP_IDS.tokenize(',').collect { "\"${it.trim()}\"" }.join(',')
+              // Convert comma-separated input into HCL-compatible list syntax
+              def subnetList = params.SUBNET_IDS.split(',').collect { "\"${it.trim()}\"" }.join(',')
+              def sgList = params.SECURITY_GROUP_IDS.split(',').collect { "\"${it.trim()}\"" }.join(',')
 
               sh """
-                docker run --rm -v \$(pwd):/workspace -w /workspace hashicorp/terraform:1.6.0 init -input=false
-                docker run --rm -v \$(pwd):/workspace -w /workspace hashicorp/terraform:1.6.0 apply -auto-approve \
-                  -var "aws_region=${AWS_REGION}" \
-                  -var "cluster_name=${ECS_CLUSTER}" \
-                  -var "service_name=${ECS_SERVICE}" \
-                  -var "task_family=${TASK_FAMILY}" \
-                  -var "initial_image=${DOCKERHUB_REPO}:latest" \
-                  -var "subnet_ids=[${subnetList}]" \
-                  -var "security_group_ids=[${sgList}]" \
-                  -var "assign_public_ip=${ASSIGN_PUBLIC_IP}"
+                docker run --rm -v \$(pwd):/workspace -w /workspace \
+                  -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
+                  -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
+                  -e AWS_DEFAULT_REGION=${AWS_REGION} \
+                  hashicorp/terraform:1.6.0 init -input=false
+
+                docker run --rm -v \$(pwd):/workspace -w /workspace \
+                  -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
+                  -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
+                  -e AWS_DEFAULT_REGION=${AWS_REGION} \
+                  hashicorp/terraform:1.6.0 apply -auto-approve \
+                    -var 'aws_region=${AWS_REGION}' \
+                    -var 'cluster_name=${ECS_CLUSTER}' \
+                    -var 'service_name=${ECS_SERVICE}' \
+                    -var 'task_family=${TASK_FAMILY}' \
+                    -var 'initial_image=${DOCKERHUB_REPO}:latest' \
+                    -var 'subnet_ids=[${subnetList}]' \
+                    -var 'security_group_ids=[${sgList}]' \
+                    -var 'assign_public_ip=${ASSIGN_PUBLIC_IP}'
               """
             }
           }
