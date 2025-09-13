@@ -7,7 +7,7 @@ pipeline {
     string(name: 'ECS_CLUSTER', defaultValue: 'lemon-cluster', description: 'ECS Cluster name')
     string(name: 'ECS_SERVICE', defaultValue: 'lemon-service', description: 'ECS Service name')
     string(name: 'TASK_FAMILY', defaultValue: 'lemonmerchant', description: 'ECS Task definition family')
-    string(name: 'SUBNET_IDS', defaultValue: 'subnet-0d6a7e801ac724083,subnet-099cd2ccb7a6121e4', description: 'Comma-separated Subnet IDs for ECS tasks')
+    string(name: 'SUBNET_IDS', defaultValue: 'subnet-0d6a7e801ac724083,subnet-08956fdaa29acf672', description: 'Comma-separated Subnet IDs for ECS tasks')
     string(name: 'SECURITY_GROUP_IDS', defaultValue: 'sg-0cc4381d9ea62a731', description: 'Comma-separated Security Group IDs for ECS tasks')
     booleanParam(name: 'ASSIGN_PUBLIC_IP', defaultValue: true, description: 'Assign public IP to tasks?')
   }
