@@ -50,15 +50,15 @@ pipeline {
 
     stage('Push to Docker Hub') {
       steps {
-        withCredentials([usernamePassword(credentialsId: 'dockerhub-kbkn', usernameVariable: 'DOCKERHUB_USER', passwordVariable: 'DOCKERHUB_PASS')]) {
+        withCredentials([string(credentialsId: 'dockerhub-kbkn', variable: 'DOCKERHUB_PAT')]) {
           sh '''
-            echo "$DOCKERHUB_PASS" | docker login -u "$DOCKERHUB_USER" --password-stdin
-            docker push ${DOCKERHUB_REPO}:${IMAGE_TAG}
+           echo "$DOCKERHUB_PAT" | docker login -u kbkn1106 --password-stdin
+           docker push ${DOCKERHUB_REPO}:${IMAGE_TAG}
             docker push ${DOCKERHUB_REPO}:latest
-          '''
-        }
-      }
+            '''
     }
+  }
+}
 
     stage('Terraform Apply (main only)') {
       when {
