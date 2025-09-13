@@ -107,8 +107,8 @@ resource "aws_lb_target_group" "ecs_tg" {
     protocol            = "HTTP"
     healthy_threshold   = 2
     unhealthy_threshold = 2
-    interval            = 30
-    timeout             = 5
+    interval            = 120
+    timeout             = 60
     enabled             = true
   }
 }
