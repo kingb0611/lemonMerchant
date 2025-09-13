@@ -2,18 +2,25 @@ pipeline {
   agent any
 
   parameters {
+    // Docker & ECS
     string(name: 'DOCKERHUB_REPO', defaultValue: 'kbkn1106/lemonmerchant', description: 'Docker Hub repo (user/repo)')
-    string(name: 'AWS_REGION', defaultValue: 'ap-south-1', description: 'AWS REGION')
+    string(name: 'AWS_REGION', defaultValue: 'ap-south-1', description: 'AWS region')
     string(name: 'ECS_CLUSTER', defaultValue: 'lemon-cluster', description: 'ECS Cluster name')
     string(name: 'ECS_SERVICE', defaultValue: 'lemon-service', description: 'ECS Service name')
     string(name: 'TASK_FAMILY', defaultValue: 'lemonmerchant', description: 'ECS Task definition family')
-    string(name: 'SUBNET_IDS', defaultValue: 'subnet-0d6a7e801ac724083,subnet-08956fdaa29acf672', description: 'Comma-separated Subnet IDs for ECS tasks')
+
+    // ECS network configuration
+    string(name: 'SUBNET_IDS', defaultValue: 'subnet-0d6a7e801ac724083,subnet-08956fdaa29acf672', description: 'Comma-separated subnet IDs for ECS tasks')
     string(name: 'SECURITY_GROUP_IDS', defaultValue: 'sg-0cc4381d9ea62a731', description: 'Comma-separated Security Group IDs for ECS tasks')
-    string(name: 'ALB_SUBNET_IDS', defaultValue: 'subnet-099cd2ccb7a6121e4,subnet-0d6a7e801ac724083', description: 'ALB subnet IDs')
-    string(name: 'ALB_SECURITY_GROUP_IDS', defaultValue: 'sg-0cc4381d9ea62a731', description: 'ALB security group IDs')
-    string(name: 'VPC_ID', defaultValue: 'vpc-08bb20cc06ca3c5d5', description: 'VPC ID for ALB')
-    booleanParam(name: 'ASSIGN_PUBLIC_IP', defaultValue: true, description: 'Assign public IP to tasks?')
-  }
+    booleanParam(name: 'ASSIGN_PUBLIC_IP', defaultValue: true, description: 'Assign public IP to ECS tasks?')
+
+    // ALB configuration
+    string(name: 'ALB_SUBNET_IDS', defaultValue: 'subnet-0d6a7e801ac724083,subnet-08956fdaa29acf672', description: 'Comma-separated public subnet IDs for ALB')
+    string(name: 'ALB_SECURITY_GROUP_IDS', defaultValue: 'sg-0cc4381d9ea62a731', description: 'Comma-separated security group IDs for ALB')
+    
+    // VPC
+    string(name: 'VPC_ID', defaultValue: 'vpc-08bb20cc06ca3c5d5', description: 'VPC ID for ALB and ECS')
+}
 
   environment {
     DOCKERHUB_REPO = "${params.DOCKERHUB_REPO}"
@@ -63,43 +70,47 @@ pipeline {
     }
 
     stage('Terraform Apply') {
-      steps {
-        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-kbkn']]) {
-          dir('terraform') {
-            script {
-              // Convert comma-separated input into HCL-compatible list syntax
-              def subnetList = params.SUBNET_IDS.split(',').collect { "\"${it.trim()}\"" }.join(',')
-              def sgList = params.SECURITY_GROUP_IDS.split(',').collect { "\"${it.trim()}\"" }.join(',')
+  steps {
+    withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-kbkn']]) {
+      dir('terraform') {
+        script {
+          // Convert ECS subnet and SG input into HCL-compatible list
+          def subnetList = params.SUBNET_IDS.split(',').collect { "\"${it.trim()}\"" }.join(',')
+          def sgList = params.SECURITY_GROUP_IDS.split(',').collect { "\"${it.trim()}\"" }.join(',')
 
-              sh """
-                docker run --rm -v \$(pwd):/workspace -w /workspace \
-                  -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
-                  -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
-                  -e AWS_DEFAULT_REGION=${AWS_REGION} \
-                  hashicorp/terraform:1.6.0 init -input=false
+          // Convert ALB subnet and SG input into HCL-compatible list
+          def albSubnetList = params.ALB_SUBNET_IDS.split(',').collect { "\"${it.trim()}\"" }.join(',')
+          def albSgList = params.ALB_SECURITY_GROUP_IDS.split(',').collect { "\"${it.trim()}\"" }.join(',')
 
-                docker run --rm -v \$(pwd):/workspace -w /workspace \
-                  -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
-                  -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
-                  -e AWS_DEFAULT_REGION=${AWS_REGION} \
-                  hashicorp/terraform:1.6.0 apply -auto-approve \
-                    -var 'aws_region=${AWS_REGION}' \
-                    -var 'cluster_name=${ECS_CLUSTER}' \
-                    -var 'service_name=${ECS_SERVICE}' \
-                    -var 'task_family=${TASK_FAMILY}' \
-                    -var 'initial_image=${DOCKERHUB_REPO}:latest' \
-                    -var 'subnet_ids=[${subnetList}]' \
-                    -var 'security_group_ids=[${sgList}]' \
-                    -var 'assign_public_ip=${ASSIGN_PUBLIC_IP}' \
-                    -var 'alb_subnets=[${albSubnetList}]' \
-                    -var 'alb_security_group_ids=[${albSgList}]' \
-                    -var 'vpc_id=${params.VPC_ID}'
-              """
-            }
-          }
+          sh """
+            docker run --rm -v \$(pwd):/workspace -w /workspace \
+              -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
+              -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
+              -e AWS_DEFAULT_REGION=${AWS_REGION} \
+              hashicorp/terraform:1.6.0 init -input=false
+
+            docker run --rm -v \$(pwd):/workspace -w /workspace \
+              -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
+              -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
+              -e AWS_DEFAULT_REGION=${AWS_REGION} \
+              hashicorp/terraform:1.6.0 apply -auto-approve \
+                -var 'aws_region=${AWS_REGION}' \
+                -var 'cluster_name=${ECS_CLUSTER}' \
+                -var 'service_name=${ECS_SERVICE}' \
+                -var 'task_family=${TASK_FAMILY}' \
+                -var 'initial_image=${DOCKERHUB_REPO}:latest' \
+                -var 'subnet_ids=[${subnetList}]' \
+                -var 'security_group_ids=[${sgList}]' \
+                -var 'assign_public_ip=${ASSIGN_PUBLIC_IP}' \
+                -var 'alb_subnets=[${albSubnetList}]' \
+                -var 'alb_security_group_ids=[${albSgList}]' \
+                -var 'vpc_id=${params.VPC_ID}'
+          """
         }
       }
     }
+  }
+}
 
     stage('Fetch Terraform Outputs (main only)') {
       steps {
